@@ -25,6 +25,7 @@ export default function NewChildPage() {
     bloodGroup: "",
     aadhaarNumber: "",
     address: "",
+    parentEmail: "",
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,6 +48,23 @@ export default function NewChildPage() {
         throw new Error("No Anganwadi center assigned to your account")
       }
 
+      // If a parent email is provided, try to find the parent profile
+      let parentId: string | null = null
+      if (formData.parentEmail.trim()) {
+        const { data: parentProfile, error: parentError } = await supabase
+          .from("profiles")
+          .select("id, role")
+          .eq("email", formData.parentEmail.trim().toLowerCase())
+          .single()
+
+        if (parentError && parentError.code !== "PGRST116") {
+          // Unexpected error looking up parent
+          console.error("Failed to look up parent profile:", parentError)
+        } else if (parentProfile && parentProfile.role === "parent") {
+          parentId = parentProfile.id
+        }
+      }
+
       // Insert child
       const { data: child, error: insertError } = await supabase
         .from("children")
@@ -58,6 +76,7 @@ export default function NewChildPage() {
           blood_group: formData.bloodGroup || null,
           aadhaar_number: formData.aadhaarNumber || null,
           address: formData.address || null,
+          parent_id: parentId,
           status: "active",
         })
         .select()
@@ -216,6 +235,26 @@ export default function NewChildPage() {
                   className="min-h-24 text-base"
                   disabled={isLoading}
                 />
+              </div>
+
+              {/* Parent Email */}
+              <div className="space-y-2">
+                <Label htmlFor="parentEmail" className="text-base font-semibold text-emerald-900">
+                  Parent Email (Optional)
+                </Label>
+                <Input
+                  id="parentEmail"
+                  type="email"
+                  placeholder="parent@example.com"
+                  value={formData.parentEmail}
+                  onChange={(e) => setFormData({ ...formData, parentEmail: e.target.value })}
+                  className="h-12 text-base"
+                  disabled={isLoading}
+                />
+                <p className="text-xs text-emerald-700">
+                  If the parent has an account with this email (role <code>parent</code>), they will automatically see
+                  this child in their dashboard.
+                </p>
               </div>
 
               {error && (
